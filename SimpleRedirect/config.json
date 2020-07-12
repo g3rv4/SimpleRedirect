@@ -1,0 +1,14 @@
+{
+  "Key": "localkey",
+  "Domains":
+  [
+    {
+      "Domain": "localhost",
+      "DataUrl": "https://raw.githubusercontent.com/g3rv4/redirections/master/urls.json",
+      "Cloudflare": {
+        "Zones": ["somezone"],
+        "ApiKey": "someApiKey"
+      }
+    }
+  ]
+}
