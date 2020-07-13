@@ -25,4 +25,4 @@ jobs:
     - name: Create and deploy an Octopus release
       run: |
         dotnet tool install --global Octopus.DotNet.Cli
-        dotnet-octo create-release --project SimpleRedirect --releaseNumber $VERSION --package simpleredirect:$VERSION --deployto Dev --server "${{ steps.azureSecrets.outputs.OctopusServerUrl }}" --apiKey "${{ steps.azureSecrets.outputs.OctopusApiKey }}" --progress
+        dotnet-octo create-release --project SimpleRedirect --releaseNumber $VERSION --package simpleredirect:$VERSION --deployto Prod --server "${{ steps.azureSecrets.outputs.OctopusServerUrl }}" --apiKey "${{ steps.azureSecrets.outputs.OctopusApiKey }}" --progress

@@ -11,6 +11,7 @@ using Jil;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using SimpleRedirect.Models;
+using YamlDotNet.Serialization;
 
 namespace SimpleRedirect.Controllers
 {
@@ -131,9 +132,20 @@ namespace SimpleRedirect.Controllers
             }
 
             var response = await _httpClient.GetAsync(domainConfig.DataUrl);
-            var json = await response.Content.ReadAsStringAsync();
-            var urls = JSON.Deserialize<Dictionary<string, string>>(json);
-            _domains[domain] = new Dictionary<string, string>(urls, StringComparer.OrdinalIgnoreCase);
+            var content = await response.Content.ReadAsStringAsync();
+
+            if (domainConfig.DataUrl.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+            {
+                var urls = JSON.Deserialize<Dictionary<string, string>>(content);
+                _domains[domain] = new Dictionary<string, string>(urls, StringComparer.OrdinalIgnoreCase);
+            }
+            else if (domainConfig.DataUrl.EndsWith(".yml", StringComparison.OrdinalIgnoreCase))
+            {
+                using var reader = new StringReader(content);
+                var deserializer = new Deserializer();
+                var urls = deserializer.Deserialize<Dictionary<string, string>>(content);
+                _domains[domain] = new Dictionary<string, string>(urls, StringComparer.OrdinalIgnoreCase);
+            }
         }
     }
 }
