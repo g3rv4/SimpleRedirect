@@ -1,28 +1,71 @@
 name: build
 on:
   push:
-    branches: [ master ]
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        architecture: [ amd64, arm64v8 ]
     steps:
-    - uses: actions/checkout@v2
-    - name: Build project
-      shell: pwsh
-      run: ./build.ps1 $env:GITHUB_RUN_NUMBER $env:GITHUB_SHA
-    - name: Push it to GitHub
-      run: curl -X PUT -u "$GITHUB_ACTOR:${{ secrets.GITHUB_TOKEN }}" -F package=@$PKG_PATH https://nuget.pkg.github.com/g3rv4/
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # get entire git tree, required for nerdbank gitversioning
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push the Docker image
+        shell: pwsh
+        run: |
+          Push-Location src
+          $version = (nbgv get-version -f json | ConvertFrom-Json).SimpleVersion
+          Write-Host "Version $version"
+          Pop-Location
 
-    - uses: Azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
-    - uses: Azure/get-keyvault-secrets@v1.1
-      with:
-        keyvault: "ActionsBuild"
-        secrets: 'OctopusServerUrl, OctopusApiKey'
-      id: azureSecrets
-    - name: Create and deploy an Octopus release
-      run: |
-        dotnet tool install --global Octopus.DotNet.Cli
-        dotnet-octo create-release --project SimpleRedirect --releaseNumber $VERSION --package simpleredirect:$VERSION_WITHOUT_HASH --deployto Prod --server "${{ steps.azureSecrets.outputs.OctopusServerUrl }}" --apiKey "${{ steps.azureSecrets.outputs.OctopusApiKey }}" --progress
+          if ('${{ matrix.architecture }}' -eq 'arm64v8') {
+            sudo apt-get install qemu binfmt-support qemu-user-static
+            docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
+          }
+
+          docker build . -t ghcr.io/g3rv4/simpleredirect:latest-${{ matrix.architecture }} --build-arg ARCH=${{ matrix.architecture }}
+          docker tag ghcr.io/g3rv4/simpleredirect:latest-${{ matrix.architecture }} ghcr.io/g3rv4/simpleredirect:$version-${{ matrix.architecture }}
+          docker push ghcr.io/g3rv4/simpleredirect:latest-${{ matrix.architecture }}
+          docker push ghcr.io/g3rv4/simpleredirect:$version-${{ matrix.architecture }}
+  push-manifest:
+    runs-on: ubuntu-latest
+    needs: [ build ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # get entire git tree, required for nerdbank gitversioning
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build manifest
+        shell: pwsh
+        run: |
+          Push-Location src
+          $version = (nbgv get-version -f json | ConvertFrom-Json).SimpleVersion
+          Write-Host "Version $version"
+          Pop-Location
+
+          docker manifest create `
+                ghcr.io/g3rv4/simpleredirect:latest `
+                --amend ghcr.io/g3rv4/simpleredirect:latest-amd64 `
+                --amend ghcr.io/g3rv4/simpleredirect:latest-arm64v8
+          docker manifest create `
+                ghcr.io/g3rv4/simpleredirect:$version `
+                --amend ghcr.io/g3rv4/simpleredirect:$version-amd64 `
+                --amend ghcr.io/g3rv4/simpleredirect:$version-arm64v8
+          docker manifest push ghcr.io/g3rv4/simpleredirect:latest
+          docker manifest push ghcr.io/g3rv4/simpleredirect:$version
