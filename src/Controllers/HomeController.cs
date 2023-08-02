@@ -59,6 +59,9 @@ namespace SimpleRedirect.Controllers
             return Content("Page not found");
         }
 
+        [Route("health")]
+        public IActionResult Health() => Ok();
+
         [Route("refresh")]
         public async Task<IActionResult> RefreshDomain(string domain, string key)
         {
