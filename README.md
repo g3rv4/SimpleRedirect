@@ -1,0 +1,1 @@
+This project has been abandoned. I'm now using [telegramRedirect](https://github.com/g3rv4/telegramRedirect) instead for an easy way to manage the shortcodes and an nginx-powered redirection container.
